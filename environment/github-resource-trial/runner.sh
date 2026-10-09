@@ -76,7 +76,7 @@ setup() {
   apt-get update
   DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     bash build-essential ca-certificates coreutils curl git jq libssl-dev \
-    pkg-config python3 util-linux xz-utils rsync
+    pkg-config python3 util-linux xz-utils
   apt-get clean
   runuser -u runner -- env -i HOME=/home/riemann ELAN_HOME=/home/riemann/.elan PATH="$PATH" \
     git clone --quiet "https://github.com/$official_repo.git" "$root"
@@ -115,12 +115,87 @@ setup() {
   printf 'Pinned official verifier setup complete at %s\n' "$official_commit"
 }
 
+copy_workspace_tree() {
+  local source=$1 destination=$2
+  [[ -d "$source" && -d "$destination" && ! -L "$destination" ]] || return 94
+  [[ -z "$(find "$destination" -mindepth 1 -maxdepth 1 -print -quit)" ]] || return 94
+  # rsync uses socketpair even for local copies. GNU cp needs no socket IPC.
+  # Select top-level entries so nested .lake directories and dotfiles survive.
+  find "$source" -mindepth 1 -maxdepth 1 ! -name .lake \
+    -exec cp -a --no-preserve=ownership --target-directory="$destination" -- {} +
+  # Default find traversal never follows symlinks into the trusted source.
+  find "$destination" \( -type d -o -type f \) -exec chmod u+w -- {} +
+}
+
+probe() (
+  python3 -c 'import socket' || exit 93
+  printf 'Python socket baseline ready\n'
+  set +e
+  python3 -c 'import socket; socket.socket(socket.AF_INET, socket.SOCK_STREAM)' >/dev/null 2>&1
+  local inet_status=$?
+  python3 -c 'import socket; socket.socketpair()' >/dev/null 2>&1
+  local unix_status=$?
+  set -e
+  printf 'Network probe exit statuses: inet=%s unix=%s\n' "$inet_status" "$unix_status"
+  [[ "$inet_status" -ne 0 && "$unix_status" -ne 0 ]]
+
+  probe_dir="$(mktemp -d /home/riemann/riemann-preflight.XXXXXX)"
+  [[ "$probe_dir" == /home/riemann/riemann-preflight.* && -d "$probe_dir" && ! -L "$probe_dir" ]] || exit 94
+  trap 'chmod -R u+w -- "$probe_dir"; rm -rf -- "$probe_dir"' EXIT
+  mkdir -p "$probe_dir/source/.lake" "$probe_dir/source/.git" \
+    "$probe_dir/source/nested/.lake" "$probe_dir/source/dir with space" "$probe_dir/copy"
+  printf 'hidden\n' > "$probe_dir/source/.hidden"
+  printf 'git\n' > "$probe_dir/source/.git/config"
+  printf 'excluded\n' > "$probe_dir/source/.lake/excluded"
+  printf 'retained\n' > "$probe_dir/source/nested/.lake/retained"
+  printf '#!/bin/sh\nexit 0\n' > "$probe_dir/source/dir with space/executable"
+  printf 'trusted\n' > "$probe_dir/trusted"
+  chmod 0755 "$probe_dir/source/dir with space/executable"
+  chmod 0444 "$probe_dir/trusted"
+  ln -s .hidden "$probe_dir/source/file-link"
+  ln -s nested "$probe_dir/source/dir-link"
+  ln -s missing "$probe_dir/source/dangling-link"
+  ln -s ../trusted "$probe_dir/source/trusted-link"
+  chmod -R a-w -- "$probe_dir/source"
+  copy_workspace_tree "$probe_dir/source" "$probe_dir/copy"
+  [[ ! -e "$probe_dir/copy/.lake" && -f "$probe_dir/copy/.git/config" ]]
+  [[ -f "$probe_dir/copy/nested/.lake/retained" && -x "$probe_dir/copy/dir with space/executable" ]]
+  [[ -L "$probe_dir/copy/file-link" && -L "$probe_dir/copy/dir-link" && -L "$probe_dir/copy/dangling-link" ]]
+  [[ "$(readlink "$probe_dir/copy/file-link")" == .hidden && "$(readlink "$probe_dir/copy/dir-link")" == nested ]]
+  [[ "$(readlink "$probe_dir/copy/trusted-link")" == ../trusted ]]
+  [[ "$(stat -c %a "$probe_dir/source/.hidden")" == 444 && "$(stat -c %a "$probe_dir/trusted")" == 444 ]]
+  [[ "$(stat -c %a "$probe_dir/source/nested")" == 555 ]]
+  [[ -w "$probe_dir/copy/.hidden" && -w "$probe_dir/copy/nested" ]]
+  printf 'Workspace copy fixture passed\n'
+  node --input-type=module - "$probe_dir" <<'JS'
+import assert from 'node:assert/strict';
+import { appendFile, cp, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+assert.match(process.version, /^v22\./);
+const workspace = join(process.argv[2], 'copy');
+assert.equal(await readFile(join(workspace, '.hidden'), 'utf8'), 'hidden\n');
+assert.ok((await readdir(workspace, { withFileTypes: true })).some(entry => entry.name === '.git'));
+assert.equal((await stat(join(workspace, '.hidden'))).size, 7);
+await mkdir(join(workspace, 'comparator', 'Solution'), { recursive: true });
+await writeFile(join(workspace, 'comparator', 'Solution', 'Candidate.lean'), 'fixture\n');
+await appendFile(join(workspace, '.hidden'), 'writable\n');
+assert.equal(await readFile(join(process.argv[2], 'source', '.hidden'), 'utf8'), 'hidden\n');
+await cp(join(workspace, '.git'), join(workspace, 'Candidate'), { recursive: true, errorOnExist: true });
+await writeFile(join(workspace, 'config.json'), JSON.stringify({ enable_nanoda: true }));
+assert.equal(JSON.parse(await readFile(join(workspace, 'config.json'), 'utf8')).enable_nanoda, true);
+console.log(`Node ${process.version} candidate-preparation filesystem fixture passed`);
+JS
+  chmod -R u+w -- "$probe_dir"
+  rm -rf -- "$probe_dir"
+  trap - EXIT
+)
+
 verify() {
   # RuntimeMaxSec on this unit covers copying, candidate preparation and Comparator.
   install -d -m 0700 "$work" "$work/submission" "$work/submission/proof" "$work/zeta23"
   install -m 0444 "$GITHUB_WORKSPACE/$proof_name" "$work/submission/proof/Solution.lean"
   cp "$GITHUB_WORKSPACE/environment/github-resource-trial/submission.json" "$work/submission/submission.json"
-  rsync -a --chmod=Du+w,Fu+w --exclude='/.lake' "$root/zeta23/" "$work/zeta23/"
+  copy_workspace_tree "$root/zeta23" "$work/zeta23"
   mkdir -p "$work/zeta23/.lake/build/lib/lean" "$work/zeta23/.lake/build/ir"
   ln -s "$root/zeta23/.lake/packages" "$work/zeta23/.lake/packages"
   local part base
@@ -174,15 +249,10 @@ main() {
     --property=RestrictAddressFamilies=AF_UNIX \
     --property=NoNewPrivileges=yes --property=TasksMax=512 \
     --property=LimitCORE=0 \
-    -- /usr/bin/bash -c 'python3 -c "import socket" || exit 93
-printf "Python socket baseline ready\n"
-set +e
-python3 -c "import socket; socket.socket(socket.AF_INET, socket.SOCK_STREAM)" >/dev/null 2>&1
-inet_status=$?
-python3 -c "import socket; socket.socketpair()" >/dev/null 2>&1
-unix_status=$?
-printf "Network probe exit statuses: inet=%s unix=%s\n" "$inet_status" "$unix_status"
-[[ "$inet_status" -ne 0 && "$unix_status" -ne 0 ]]'
+    --setenv="PATH=$PATH" --setenv="HOME=/home/riemann" \
+    --setenv="GITHUB_RUN_ID=$GITHUB_RUN_ID" \
+    --setenv="GITHUB_RUN_ATTEMPT=$GITHUB_RUN_ATTEMPT" \
+    -- /usr/bin/bash "$GITHUB_WORKSPACE/environment/github-resource-trial/runner.sh" probe
   systemd-run --unit="$setup_unit" --slice="$slice" --wait --pipe --collect \
     --property=RuntimeMaxSec=5400 --setenv="PATH=$PATH" \
     --setenv="GITHUB_RUN_ID=$GITHUB_RUN_ID" \
@@ -220,7 +290,8 @@ printf "Network probe exit statuses: inet=%s unix=%s\n" "$inet_status" "$unix_st
 
 case "${1:-}" in
   setup) setup ;;
+  probe) probe ;;
   verify) verify ;;
   '') main ;;
-  *) echo 'Usage: runner.sh [setup|verify]' >&2; exit 2 ;;
+  *) echo 'Usage: runner.sh [setup|probe|verify]' >&2; exit 2 ;;
 esac
