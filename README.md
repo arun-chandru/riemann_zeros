@@ -15,11 +15,11 @@ $$
        =0.673547805029767868\ldots,
 $$
 
-approximately 67.3547805%, for distinct critical-line zeros relative to all nontrivial zeros counted with multiplicity. The distinction matters: a multiple zero contributes once to the numerator and according to its multiplicity to the denominator. The internal argument first controls simple critical-line zeros and then obtains the requested distinct-zero conclusion.
+approximately 67.3547805%, for distinct critical-line zeros relative to all nontrivial zeros counted with multiplicity. The distinction matters: a multiple zero contributes once to the numerator and according to its multiplicity to the denominator. The internal argument first controls simple critical-line zeros and then obtains the distinct-zero conclusion.
 
 The proof reuses an existing, attributed eight-point numerical certificate and analytic window. An additional same-operator transfer combines spectral control of separated Gram-matrix blocks, close-pair matching, and pinching to retain the full matrix defect used by the counting argument. Sparse error accounting charges approximation errors only to the relevant finite-neighbour band, keeping that cost proportional to the number of retained points. The resulting defect estimate is composed with the inherited certificate and analytic zero-counting framework.
 
-The conclusion covers both dyadic height windows and cumulative windows. For every positive tolerance, the bound holds above some height; no numerical threshold or uniform assertion for every small window is supplied. The inherited certificate is not claimed as newly discovered or newly generated here. The adaptation and its source credits are distinguished below.
+The conclusion covers both dyadic height windows and cumulative windows. For every positive tolerance, the bound holds above some height; no numerical threshold or uniform assertion for every small window is supplied. The inherited certificate is not claimed as newly discovered or newly generated here. The adaptation and its source credits are mentioned below.
 
 ## Method
 
