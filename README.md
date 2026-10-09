@@ -60,3 +60,7 @@ The analytic window and exact eight-point certificate are inherited from Samuel 
 The same-operator full-defect transfer and its composition are the additional adaptation documented here. Attributed ingredients include Kristian Muri Knausgard's [formal development](https://github.com/kristianmk/839/tree/0e961ea199b425010843bc8044676d4ad29fe031/lean), [Anthropic Zeta23](https://github.com/anthropics/zeta-23-lean/tree/3635e74826a4c1fcece7d1cd2b6fa75e43a00510), [AMTOPA's window-family work](https://github.com/AMTOPA/zeta-exact-pressure/tree/7253fdcab9366af45b8c8caf44e408c0af44a1a7), and [Thomas Lince's Zeta Lab bridge](https://github.com/teal-sea/zeta-lab/tree/aa6af68acd48466e9b005b80aaf608036de44c99). The proof contains specific change notices and more inherited credits.
 
 New contributions are offered under [Apache-2.0](LICENSE). Incorporated portions retain their applicable notices/terms, including MIT notices; see [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt) and the embedded notices.
+
+## Note on AI use
+
+The author declares the substantial use of consumer-grade Gemini-3 and GPT-6 models for literature search, exploring and developing ideas, codes and proofs, drafting and LaTeX typesetting; the author takes full and sole responsibility for all contents of this work.
