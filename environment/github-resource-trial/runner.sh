@@ -164,14 +164,19 @@ main() {
   metrics initial
   # Prove that the intended systemd sandbox properties are available before
   # downloading or building trusted tools, and before touching the proof.
+  # Deny the same network syscalls as the official wrapper, but return EPERM
+  # rather than SIGSYS so incidental libc/NSS socket attempts can fall back.
   systemd-run --unit="$probe_unit" --slice="$slice" --wait --pipe --collect \
     --property=User=runner --property=PrivateNetwork=yes \
     --property=SystemCallArchitectures=native \
     --property=SystemCallFilter=~@network-io \
+    --property=SystemCallErrorNumber=EPERM \
     --property=RestrictAddressFamilies=AF_UNIX \
     --property=NoNewPrivileges=yes --property=TasksMax=512 \
     --property=LimitCORE=0 \
-    -- /usr/bin/bash -c 'set +e
+    -- /usr/bin/bash -c 'python3 -c "import socket" || exit 93
+printf "Python socket baseline ready\n"
+set +e
 python3 -c "import socket; socket.socket(socket.AF_INET, socket.SOCK_STREAM)" >/dev/null 2>&1
 inet_status=$?
 python3 -c "import socket; socket.socketpair()" >/dev/null 2>&1
@@ -199,6 +204,7 @@ printf "Network probe exit statuses: inet=%s unix=%s\n" "$inet_status" "$unix_st
   systemd-run --unit="$verify_unit" --slice="$slice" --wait --pipe --collect \
     --property=User=runner --property=WorkingDirectory=/home/riemann \
     --property=PrivateNetwork=yes --property=SystemCallFilter=~@network-io \
+    --property=SystemCallErrorNumber=EPERM \
     --property=SystemCallArchitectures=native \
     --property=RestrictAddressFamilies=AF_UNIX \
     --property=NoNewPrivileges=yes --property=TasksMax=512 \
