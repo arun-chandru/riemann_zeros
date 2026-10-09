@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "arun-chandru-resource-trial",
+  "track": "critical-line",
+  "author": {
+    "github": "arun-chandru",
+    "displayName": "Arun Chandru"
+  },
+  "score": {
+    "numerator": "66812491",
+    "denominator": "99194876"
+  },
+  "proof": {
+    "solution": "proof/Solution.lean",
+    "theorem": "candidate_critical_line_bound",
+    "cumulativeTheorem": "candidate_critical_line_bound_cumulative",
+    "improvementTheorem": "candidate_strict_improvement"
+  },
+  "summary": "Resource trial of the unchanged Arun Chandru formal proof against the pinned official Comparator verifier.",
+  "method": "Existing Lean proof, unchanged",
+  "model": null,
+  "harness": null,
+  "license": "Apache-2.0"
+}

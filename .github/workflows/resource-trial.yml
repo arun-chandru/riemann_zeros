@@ -1,0 +1,26 @@
+name: Proof resource test
+
+on:
+  push:
+    branches:
+      - codex/resource-check-2026-10-09
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: riemann-resource-trial-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Proof resource test
+        shell: bash
+        run: sudo --preserve-env=GITHUB_WORKSPACE,GITHUB_REPOSITORY,GITHUB_REF,GITHUB_RUN_ID,GITHUB_RUN_ATTEMPT,GITHUB_STEP_SUMMARY bash environment/github-resource-trial/runner.sh
