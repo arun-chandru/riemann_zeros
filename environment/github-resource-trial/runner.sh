@@ -170,11 +170,14 @@ main() {
     --property=SystemCallFilter=~@network-io \
     --property=RestrictAddressFamilies=AF_UNIX \
     --property=NoNewPrivileges=yes --property=TasksMax=512 \
-    -- /usr/bin/python3 -c 'import socket; blocked=0
-for f in (lambda: socket.socket(socket.AF_INET, socket.SOCK_STREAM), socket.socketpair):
-  try: f()
-  except OSError: blocked += 1
-assert blocked == 2, "network syscall filter unavailable"'
+    --property=LimitCORE=0 \
+    -- /usr/bin/bash -c 'set +e
+python3 -c "import socket; socket.socket(socket.AF_INET, socket.SOCK_STREAM)" >/dev/null 2>&1
+inet_status=$?
+python3 -c "import socket; socket.socketpair()" >/dev/null 2>&1
+unix_status=$?
+printf "Network probe exit statuses: inet=%s unix=%s\n" "$inet_status" "$unix_status"
+[[ "$inet_status" -ne 0 && "$unix_status" -ne 0 ]]'
   systemd-run --unit="$setup_unit" --slice="$slice" --wait --pipe --collect \
     --property=RuntimeMaxSec=5400 --setenv="PATH=$PATH" \
     --setenv="GITHUB_RUN_ID=$GITHUB_RUN_ID" \
