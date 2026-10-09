@@ -1,0 +1,190 @@
+Full Apache-2.0 license is in LICENSE and the proof.
+
+=== Samuel Lavery: inherited attempt-016 notice ===
+/-
+Copyright (c) 2026 Samuel Lavery (github: samlavery). Licensed under Apache-2.0. Built on the author's
+riemannzeta.fun submissions attempt-012/013/014. Third-party portions keep the notices listed under
+"Sources and attributions" below.
+NOTICE: reuse or adaptation of this file must retain this copyright and attribution notice
+(Apache-2.0 §4(c)) and must state any changes made (§4(b)).
+The internal modules are by Samuel Lavery's agent team (bridge-port, am-cert, mvt-engine, window-scope);
+those names, and "the lead", refer to members of that team below.
+
+Riemann.fail submission: an unconditional critical-line proportion of 6735015/10000000 = 0.6735015, for the
+R window (AMTOPA's 13-term cosine family, corrections re-optimised for the eight-point bound) in place of the Montgomery–Taylor window.
+
+The mathematics: Theorem D of the pinned Zeta23 development, re-run for the window profile
+v(s) = Σ_{j<13} c_j cos(ω_j s) (ω₀ = √2, ω_j = 2πj; c_j = 1000000000, 12310798, -15041681, 3867664, 6489926, -992327, 5580097, -6846472, 3781297, -5670353, 3355089, -450523, -218483 over 10⁹), with constant
+H_W = 3/2 − cos θ₀/(√2 sin θ₀) − Σ_j c_j²(1/2 − 1/(4π²j²))/(2 sin² θ₀) ≥ 0.67216841 (θ₀ = √2/2; proved, `AMW.HW_eq`,
+`AMW.HW_ge`), and Ainta's weighted n-point simple-zero refinement at n = 8 (pair weights a_ij and per-gap
+pressures b_r, total B = 404350/100000000; `n_point_bound_w'`), made unconditional by a kernel-checked finite
+certificate `PC8C5BF` for the weighted functional on the seven gaps (c = 805124/100000000, 4598 leaves,
+half-space by reflection).  The block bound uses the √ branch of the band profile, g_τ(E_band) ≤ defect (q = 7, τ = 8/7),
+g_τ(E) = E for E ≤ τ and 2√(τE) − τ for E > τ (`band_profile_sqrt`, derived from Gebendorfer's Lemma 3.3), so
+g_τ(c(m−q)) replaces c(m−q) with no cap on m.
+Edge windows: at both ends of each block, truncated windows of k = 5, 6 gaps carry the same weights
+restricted to their gaps, each with its own certificate (floor c_k, restricted pressure B_k; `PCE5KP`: c = 552735/100000000, `PCE6UPC`: c = 693058/100000000);
+their floors join the block energy inside g_τ and their pressures join the cost.  Constant Φ = (H_W − (B(m−7) + Σ_t B_t)/m)/(1 − g_τ(c(m−7) + Σ_t c_t)/m), √ read through the rational floor 575733246763/500000000000, at m = 148, ≥ 0.673501563.
+
+Method: √ τ = 8/7 band profile (derived independently from Gebendorfer 2026 Lemma 3.3 / AMTOPA) on the
+PC8C5BF eight-point certificate.
+
+Sources and attributions:
+* the band profile (τ = (q+1)/q in place of 1): AMTOPA, zeta-exact-pressure (MIT), as presented in
+  Gebendorfer, "Zeta Geometry and Class Cap" (preprint), Lemma 3.3; proved here by bridge-port
+  (`band_profile_holds`, module BrProf: a Fenchel bound on the defect and a residue-class
+  Cauchy–Schwarz on the band, for any Hermitian G and injective rank labelling);
+* the τ chain (module BrTau, am-cert): the band-restricted window energy, `block_bound_w'_τ`,
+  `n_point_bound_w'_τ` (c(m−q) ≤ (q+1)/q in place of 1) and `AMW.am_dyadic_n_τ`;
+* √ branch of the band profile: derived independently from Gebendorfer 2026 Lemma 3.3 (module BrSqrtWS,
+  window-scope: `gtau`, `band_profile_sqrt`, `block_bound_w'_g`, `n_point_bound_w'_g`, `Phi_g`,
+  `Phi_g_ge_sqrt`, `AMW.am_dyadic_n_g`); this branch was first used on riemannzeta.fun by dani-ani0
+  (dani-bound-2026).
+* the window family (ω₀ = √2, ω_j = 2πj, 13 terms): AMTOPA, zeta-exact-pressure; the twelve corrections
+  re-optimised here for the weighted eight-point bound (LP for the weights, cutting-plane ascent for the window);
+* the pair-cell (polytope-cell) layer: pair-distance splits with persisted pair bounds, multiplier and Farkas leaves,
+  the minorant leaf proved once for every term list, the per-gap root cover (AMW.PCellCore, PCellGen, PCellLeaf,
+  PCellRoot, PCellT1): bridge-port, on the lead's polytope-cell design;
+* the slot lemmas, the box-sum write (`mat_gen`) and the Z8 zero-order tangent extension with its fast path
+  (AMW.PCellTZ, PCellZ, PCellLeafZ: `mat_gen`, `tangent_valZ`, `zsideF`, `mcheckGZ_sound`): bridge-port, to
+  mvt-engine's specification TZ.md / tz.py;
+* the exact-closure sizing of the eight-point walk with the Z8 lever, the certificate data and its independent
+  replay: mvt-engine;
+* the exact closure of the pair-cell constraint graph and its split lemmas (AMW.PCellClose: `cupd`, `cupd_ok`,
+  `cov_gmidC`, `cov_rmidC`): mvt-engine (TZ.md §5);
+* the closure splits at an arbitrary cut and the region-boundary cut (AMW.PCellCloseB: `cov_gsplitQ`, `cov_ssplitQ`,
+  `bcutL`, `qB`, `qBr`): mvt-engine (TZ.md §5);
+* the region-boundary split candidates (BSPLIT: a split may cut at the convex-region boundary nearest the midpoint,
+  ≥ 64 inside the range, with one mode bit per split): designed by the lead (size8pzb); in the closure sizing
+  (size8pz, BSPLIT=1): mvt-engine;
+* the derivative-read fast path (AMW.PCDF, AMW.PCDZ: cache-shared derivative and pyramid reads `lbDrF`, `lbF` with
+  `lbDrF_eq`, `lbF_eq`, `mvKF_eq`; coarse-first tangent sides `tcheckZC`, `tangent_valZC`, `mokTZC`, `mtermTZC`; the
+  leaf chain for any term check `mcheckGX`, `mcheckGX_sound`): bridge-port;
+* the instance module (AMW.PC8C5BFInst): bridge-port's instance layer (amg/genpcell4.py), with the closure splits,
+  the boundary-split mode and the closure walk by mvt-engine (eight/am8/genpcellC.py, CLOSE=1 LETC=1 BSPLIT=1 DFAST=3); the
+  data module (AMW.PC8C5BFData, unchunked): mvt-engine (eight/am8/make8pcC.py, the closure variant of bridge-port's
+  amg/make8pc.py), from the closure + BSPLIT sizing DATA_try2cb_0.00005.json (bench/eight/am8);
+* the pyramid lower-bound table: adapted from five-point-pyramid-2 by typh (Apache-2.0);
+* the edge-window certificates (AMW.PCE5KPInst/PCE5KPData, list-evaluated with the kind-aware leaf, and
+  AMW.PCE6UPCInst/PCE6UPCData, unrolled with shared points and data byte cuts; the prefix truncations of W8 to 5 and
+  6 gaps, certified over the whole nonnegative orthant, sharing PC8C5BFData's tables and points), their sizing and
+  data: mvt-engine; the generic kind-aware leaf check (AMW.PCellGK: `mcheckGXK`, `mcheckGXK_eq`): mvt-engine; the
+  no-reflection pair-cell layer (AMW.PCellNoRefl): mvt-engine, adapted from bridge-port's `mcheckGX_sound` and root
+  cover;
+* the edge-window chain (AMW.BrEdge, AMW.BrEdgeChain: `window_pairs_edge_le_band`, `block_energy_band_edge`,
+  `offset_average_edge`, `Phi_g_edge`, `Phi_g_edge_ge_sqrt`, `am_dyadic_n_edge`): bridge-port; the edge-window design
+  and floors: window-scope;
+* engine speed-ups in CEngine, GFar and GCell taken from seven-point-optimised-window by typh (Apache-2.0);
+* ports of Zeta23 (anthropics/zeta-23-lean, Apache-2.0, Copyright (c) 2026 Anthropic, PBC): the XiPrime window
+  family (atV, the generic zero side, ModWindow with its antitone hypothesis replaced by a positive-variation
+  budget) and the ThmD window lemmas;
+* the Zeta Lab bridge (Zeta23Ext.Bridge, Zeta23Ext.BridgeW, MIT), retargeted to the AM window.
+Every declaration is proved from the pinned anthropics/zeta-23-lean and Mathlib; no placeholders, no
+`native_decide`, no additional axioms; every certificate check is a `decide +kernel` evaluation of the data.
+Modules: Window, Kernel, Moments, Swap, Constant, Floor, Params, Trig, Adm, Profile, PV, ZeroSide, Concrete, BHalf, BrA, BrB, BrC, AMTail, BrTau, BrEdge, BrProf, BrSqrtWS, BrEdgeChain, GIv, GCell, GSinc, GMT, GTaylor, GBase, GConst, GFar, GNear, GAsm1, GAsm2, GCellSound, CFacade, CEngine, CMin, CMinX, CWindow, PCellCore, PCellGen, PCellLeaf, PCellRoot, PCellTZ, PCellZ, PCellLeafZ, PCellT1, PCellClose, PCellCloseB, PCDF, PCDZ, PC8C5BFInst, PC8C5BFData, PCellNoRefl, PCellGK, PCE5KPInst, PCE5KPData, PCE6UPCInst, PCE6UPCData.
+-/
+
+=== Kristian Muri Knausgard: upstream NOTICE ===
+NOTICE for the directory lean/
+
+Lean 4 proofs for the paper "More than 83.9% of the zeros of the Riemann zeta function are
+distinct and more than 67.34% are simple and on the critical line"
+Copyright 2026 Kristian Muri Knausgård
+
+The files in this directory are licensed under the Apache License, Version 2.0 (see LICENSE).
+They were drafted with AI assistance, as stated in README.md.
+
+This directory builds on, and contains material derived from, the Lean library
+
+    Zeta23, https://github.com/anthropics/formal-math (directory zeta23),
+    commit fbdc36bbf17d20af3fd0447c6d1a8a02773c9844,
+    Copyright 2026 Anthropic, PBC, licensed under the Apache License, Version 2.0.
+
+The library itself is not included. Derived from it are:
+
+1. upstream_relax.patch. A patch to fourteen files of the library: lines of the library and
+   changes to them. The changes are described at the top of the patch and in README.md.
+
+2. Definitions in the statement files. Challenge839.lean, Challenge673.lean,
+   ChallengeFurther.lean and Challenge889.lean repeat, character for character, definitions of
+   the library's Challenge.lean and Zeta23/Statement.lean (IsNontrivialZero, zeroMult, zerosIn,
+   Ncount, Ndist, N0simple, Nsimple, and N0mult, which is the library's N0), so that the theorems
+   here are about the same objects as the library's theorems.
+
+3. Proof text. Some proofs here follow proofs of the library and reuse lines of them; the files
+   say so in their comments. A comparison of the 212 files of the five developments with the
+   library found lines identical to lines of the library in 35 of them, 149 lines of 11132
+   (lines of 60 characters or more). The files with more than three such lines, and the library
+   files they follow:
+     Distinct839/Window/TVWindow.lean          Zeta23/XiPrime/QuarticWindow/ModWindow.lean
+     Distinct839/WindowMoments/Ramp.lean       Zeta23/XiPrime/QuarticWindow/Moments.lean
+     Distinct839/Gram/Threshold.lean           Zeta23/ZeroSide/RankTraceMult.lean
+     Distinct839/Assembly/Threshold.lean       Zeta23/ZeroSide/RankTraceMult.lean
+     Further/Threshold.lean                    Zeta23/ZeroSide/RankTraceMult.lean
+     Distinct839/Assembly/Instance.lean        Zeta23/Assembly/SeamMult.lean
+     Simple673/Assembly/Instance.lean          Zeta23/Assembly/SeamMult.lean
+     Further/Line/Instance.lean                Zeta23/Assembly/SeamMult.lean
+     Further/Dist/Instance.lean                Zeta23/Assembly/SeamMult.lean
+     Line889/Assembly/Instance.lean            Zeta23/Assembly/SeamMult.lean
+     Distinct839/Assembly/Final.lean           Zeta23/XiPrime/Assembly.lean
+     Simple673/Assembly/Final.lean             Zeta23/XiPrime/Assembly.lean
+
+The NOTICE file of the library is reproduced below, as its licence requires.
+
+--------------------------------------------------------------------------------
+Zeta23 — a Lean 4 formalization of critical-line zero-proportion theorems
+Copyright 2026 Anthropic, PBC
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product includes software derived from PrimeNumberTheoremAnd
+(https://github.com/AlexKontorovich/PrimeNumberTheoremAnd),
+Copyright the PrimeNumberTheoremAnd contributors, licensed under the Apache License, Version 2.0.
+The derived files are the ones under Zeta23/FromPNTPlus/; each carries its upstream notice
+(source file, upstream commit, original copyright line) and a description of the local modifications.
+Some of those files in turn derive from mathlib (https://github.com/leanprover-community/mathlib4),
+Copyright the mathlib contributors, Apache License, Version 2.0; their original headers are preserved.
+
+This product depends on, but does not include, Lean 4 (https://github.com/leanprover/lean4) and
+mathlib4 with its standard dependency set — fetched by the build tool from their public repositories at the
+revisions pinned in lake-manifest.json: batteries, aesop, Qq, ProofWidgets4, import-graph, LeanSearchClient and
+plausible are released under the Apache License, Version 2.0; Cli (leanprover/lean4-cli) is released under the
+MIT License (Copyright (c) 2021 Marc Huisinga). None of these dependencies is included in this repository.
+--------------------------------------------------------------------------------
+
+
+=== AMTOPA: MIT license ===
+MIT License
+
+Copyright (c) 2026 AMTOPA
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+=== Thomas Lince / Zeta Lab: MIT license ===
+MIT License
+
+Copyright (c) 2026 Thomas Lince
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
