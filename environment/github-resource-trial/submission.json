@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
-  "id": "arun-chandru-resource-trial",
+  "id": "chandru-circle-enclosure-2026",
   "track": "critical-line",
   "author": {
     "github": "arun-chandru",
-    "displayName": "Arun Chandru"
+    "displayName": "R. Arun Chandru"
   },
   "score": {
-    "numerator": "66812491",
-    "denominator": "99194876"
+    "numerator": "167031227639218487",
+    "denominator": "247987190000000000"
   },
   "proof": {
     "solution": "proof/Solution.lean",
@@ -16,9 +16,9 @@
     "cumulativeTheorem": "candidate_critical_line_bound_cumulative",
     "improvementTheorem": "candidate_strict_improvement"
   },
-  "summary": "Resource trial of the unchanged Arun Chandru formal proof against the pinned official Comparator verifier.",
-  "method": "Existing Lean proof, unchanged",
-  "model": null,
-  "harness": null,
+  "summary": "Sharpens the cosine enclosure and obtains the sine bound from sin²+cos²=1. Exact rational propagation through the unchanged Gram-defect certificate gives 167031227639218487/247987190000000000. This is an enclosure refinement, not a new counting method.",
+  "method": "Trigonometric enclosure refinement of the Gram-defect proof",
+  "model": "ChatGPT",
+  "harness": "Codex",
   "license": "Apache-2.0"
 }

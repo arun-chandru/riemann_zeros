@@ -4,10 +4,10 @@ set -euo pipefail
 # Run on a fresh ubuntu-24.04 GitHub-hosted runner.  All substantial setup and
 # verification work runs in one persistent cgroup v2 slice.
 official_repo=josusanmartin/riemann
-official_commit=6664d243005e12e155c19775b83f53721757414b
+official_commit=759cdc9f6547b884808f649492f641d188905133
 proof_name=r_arun_chandru_proof.lean
-proof_sha=f7ef331e72e8c34804e196a4cc0c6fdd69bb1c6947a51dfbf60b88a6343aad9d
-proof_bytes=1858713
+proof_sha=f35bfd108dac8504346ee3f7a7e9b6890b36fb5ca46c6fe83b5097e76b656548
+proof_bytes=1860982
 slice="riemanntrial${GITHUB_RUN_ID:?}${GITHUB_RUN_ATTEMPT:?}.slice"
 holder="riemanntrial${GITHUB_RUN_ID}${GITHUB_RUN_ATTEMPT}holder.service"
 setup_unit="riemanntrial${GITHUB_RUN_ID}${GITHUB_RUN_ATTEMPT}setup.service"
@@ -59,7 +59,7 @@ preflight() {
   python3 -c 'import ctypes; c=ctypes.CDLL(None, use_errno=True); assert c.syscall(444, 0, 0, 1) > 0' || { echo 'Landlock syscall unavailable' >&2; exit 90; }
   id runner >/dev/null || { echo 'GitHub runner account unavailable' >&2; exit 90; }
   [[ "${GITHUB_REPOSITORY:-}" == arun-chandru/riemann_zeros ]] || { echo 'Unexpected repository' >&2; exit 90; }
-  [[ "${GITHUB_REF:-}" == refs/heads/codex/resource-check-2026-10-09 ]] || { echo 'Unexpected ref' >&2; exit 90; }
+  [[ "${GITHUB_REF:-}" == refs/heads/codex/record-reclaim-2026-10-11 ]] || { echo 'Unexpected ref' >&2; exit 90; }
   [[ -f "$GITHUB_WORKSPACE/$proof_name" ]] || { echo 'Proof file missing' >&2; exit 90; }
   [[ "$(stat -c %s "$GITHUB_WORKSPACE/$proof_name")" == "$proof_bytes" ]] || { echo 'Proof byte count changed' >&2; exit 90; }
   printf '%s  %s\n' "$proof_sha" "$GITHUB_WORKSPACE/$proof_name" | sha256sum -c --status || { echo 'Proof digest changed' >&2; exit 90; }
