@@ -1,114 +1,85 @@
 #!/usr/bin/env python3
-"""Reconstruct the pinned, single-file circle-enclosure submission.
+"""Reconstruct one exact hash-pinned candidate, without running Lean.
 
-Standard library only. The input and final output are both hash pinned.
-This program reconstructs source; Lean verification is a separate step.
+The two transformation modules use only the Python standard library. The
+original source, intermediate source, and final source are hash checked.
 """
-
 import argparse
 from hashlib import sha256
 from pathlib import Path
 from urllib.request import Request, urlopen
 
+import window_candidate
+import certificate_candidate
+
 SOURCE_URL = (
     "https://raw.githubusercontent.com/josusanmartin/riemann/"
-    "6fd487c526acbfb0f76d44772614454b7289f9e6/"
-    "submissions/shi-exact-window-refinement-2026/proof/Solution.lean"
+    "e072ab396e34fd937224ff3f666d3d7a5db9fb18/"
+    "submissions/attempt-020/proof/Solution.lean"
 )
-SOURCE_SHA256 = "e77b8cbcf09949fbe2b8729d04956c0c1048e512acac9a65ba4a36a7abc85052"
-SOURCE_SIZE = 1859323
-OUTPUT_SHA256 = "f35bfd108dac8504346ee3f7a7e9b6890b36fb5ca46c6fe83b5097e76b656548"
-OUTPUT_SIZE = 1860982
+SOURCE_HASH = "704f3b488692e4f990ffefec34b7f9f39a632594cca2bc7e55d35c3e041dce6e"
+INTERMEDIATE_HASH = "9f27d659b6452a4c670ad02c9d6121dbb9df3ab5c4890c0abb1408bf456177f8"
+OUTPUT_HASH = "12c688f5330dada28515c5bae838eaeaa01ebe57cc96d3b1b4239d02f0fa1da2"
+OUTPUT_BYTES = 1729083
+PUBLIC_HASH = "9dea76f4d5145278a5ff1b52f0609a227d0148aae542e56fb41720b6c2e94b63"
+PUBLIC_BYTES = 1727667
 
-HEADER = """/-
+PUBLIC_HEADER = b'''/-
 R. Arun Chandru
 arun.chandru@gmail.com
 https://github.com/arun-chandru
 https://x.com/arunchandru
 https://researchgate.net/profile/R_Chandru
 
-Copyright (c) 2026 R. Arun Chandru, for the circle-enclosure refinement.
+Copyright (c) 2026 R. Arun Chandru, for original contributions.
 SPDX-License-Identifier: Apache-2.0
 
-Critical-line proportion: 167031227639218487/247987190000000000.
-
-This refinement sharpens the existing order-twelve cosine enclosure and
-uses sin(theta)^2 + cos(theta)^2 = 1, with proved positivity, to sharpen
-the sine lower bound. The resulting exact window floor is
-672168410556873948/10^18. The inherited matching, certificate, and
-zero-count argument propagates this floor to the displayed rational.
-No window coefficients, certificate data, analytic hypotheses, or counting
-definitions are changed. This is an enclosure improvement, not a new
-analytic or spectral method.
-
-Base source: Yuhang Shi's exact-window refinement at
-josusanmartin/riemann@6fd487c526acbfb0f76d44772614454b7289f9e6,
-submissions/shi-exact-window-refinement-2026/proof/Solution.lean.
-Shi's refinement builds on R. Arun Chandru's master-of-puppets submission,
-Samuel Lavery's certificate, and the other attributed works below.
-All inherited notices and license texts are retained. Their descriptions,
-including draft and numerical statements, refer to their historical versions.
+Modified by R. Arun Chandru, 2026-10-12.
+Critical-line proportion: 6424046928501143/9537623075000000.
+Derived from Samuel Lavery's attempt-020; inherited notices follow.
 -/
-"""
-
-SIN_PROOF = """theorem sin_theta0_ge : 162409234769194159 / 250000000000000000 ≤ Real.sin (Real.sqrt 2 / 2) := by
- have hb := sqrt2_half_bounds
- have hc := cos_theta0_le
- have hc0 : 0 ≤ Real.cos (Real.sqrt 2 / 2) :=
-   Real.cos_nonneg_of_mem_Icc ⟨by linarith [hb.1, Real.pi_gt_three], by linarith [hb.2, Real.pi_gt_three]⟩
- have hcsq : Real.cos (Real.sqrt 2 / 2) ^ 2 ≤ (190061149269609477 / 250000000000000000 : ℝ) ^ 2 :=
-   pow_le_pow_left₀ hc0 hc 2
- have hcircle := Real.sin_sq_add_cos_sq (Real.sqrt 2 / 2)
- have hs0 := sin_theta0_pos
- have hsq : (162409234769194159 / 250000000000000000 : ℝ) ^ 2 ≤ Real.sin (Real.sqrt 2 / 2) ^ 2 := by
-   nlinarith only [hcsq, hcircle]
- nlinarith only [hsq, hs0]
-"""
+'''
 
 
-def reconstruct(raw):
-    if len(raw) != SOURCE_SIZE or sha256(raw).hexdigest() != SOURCE_SHA256:
-        raise ValueError("Pinned source size or SHA256 mismatch")
-    source = raw.decode("utf-8")
-    header_end = source.index("-/") + 2
-    historical, body = source[:header_end], source[header_end:]
-    replacements = [
-        ("672168410508 / 10 ^ 12", "672168410556873948 / 10 ^ 18", 3),
-        ("672168410508 / 1000000000000", "672168410556873948 / 1000000000000000000", 6),
-        ("15184657057 / 22544290000", "167031227639218487 / 247987190000000000", 4),
-        ("76024459708 / 10 ^ 11", "190061149269609477 / 250000000000000000", 4),
-        ("64963693904 / 10 ^ 11", "162409234769194159 / 250000000000000000", 9),
-    ]
-    for old, new, count in replacements:
-        if body.count(old) != count:
-            raise ValueError("Unexpected replacement count for " + old)
-        body = body.replace(old, new)
-    if body.count("theorem sin_theta0_ge :") != 1:
-        raise ValueError("Sine theorem is missing or ambiguous")
-    start = body.index("theorem sin_theta0_ge :")
-    end = body.index("def PAMhi :", start)
-    body = body[:start] + SIN_PROOF + body[end:]
-    return (HEADER + historical + body).encode("utf-8")
+def public_source(raw):
+    """Replace only the two new optional headers; preserve inherited notices."""
+    if len(raw) != OUTPUT_BYTES or sha256(raw).hexdigest() != OUTPUT_HASH:
+        raise ValueError("Audited input mismatch")
+    first, second, inherited = raw.split(b'-/\n', 2)
+    assert first.startswith(b'/-\nR. Arun Chandru\n')
+    assert second.startswith(b'/-\nR. Arun Chandru\n')
+    assert inherited.startswith(b'/-\nR. Arun Chandru\n')
+    result = PUBLIC_HEADER + inherited
+    marker = b'import ChallengeDeps\n'
+    assert result[result.index(marker):] == raw[raw.index(marker):]
+    assert len(result) == PUBLIC_BYTES and sha256(result).hexdigest() == PUBLIC_HASH
+    return result
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", type=Path, help="Use a local copy of the pinned input")
+    parser.add_argument("--source", type=Path)
     parser.add_argument("--output", type=Path, default=Path("r_arun_chandru_proof.lean"))
     args = parser.parse_args()
     if args.source:
         raw = args.source.read_bytes()
     else:
-        request = Request(SOURCE_URL, headers={"User-Agent":"circle-enclosure-replay/1"})
+        request = Request(SOURCE_URL, headers={"User-Agent":"exact-enclosure-replay/1"})
         with urlopen(request, timeout=60) as response:
             raw = response.read()
-    result = reconstruct(raw)
-    digest = sha256(result).hexdigest()
-    if len(result) != OUTPUT_SIZE or digest != OUTPUT_SHA256:
-        raise ValueError("Reconstructed output mismatch: " + str(len(result)) + " " + digest)
+    if sha256(raw).hexdigest() != SOURCE_HASH:
+        raise ValueError("Pinned accepted source SHA256 mismatch")
+    report = window_candidate.build(raw, 20)
+    intermediate = Path(report["path"]).read_bytes()
+    if sha256(intermediate).hexdigest() != INTERMEDIATE_HASH:
+        raise ValueError("Intermediate enclosure source SHA256 mismatch")
+    final = certificate_candidate.transform(intermediate)
+    if len(final) != OUTPUT_BYTES or sha256(final).hexdigest() != OUTPUT_HASH:
+        raise ValueError("Final candidate size or SHA256 mismatch")
+    final = public_source(final)
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_bytes(result)
-    print(str(args.output) + " " + str(len(result)) + " " + digest)
+    args.output.write_bytes(final)
+    print(str(args.output), len(final), sha256(final).hexdigest())
 
 
 if __name__ == "__main__":

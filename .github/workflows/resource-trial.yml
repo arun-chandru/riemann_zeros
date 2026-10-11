@@ -3,7 +3,7 @@ name: Proof resource test
 on:
   push:
     branches:
-      - codex/record-reclaim-2026-10-11
+      - codex/record-reclaim-2026-10-12
   workflow_dispatch:
 
 permissions:
