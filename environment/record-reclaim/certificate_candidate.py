@@ -1,116 +1,83 @@
-"""Pure certificate representation/floor transform, after the Taylor20 transform.
+"""Reversible scale-100 representation change of accepted PC9QB5C data.
 
-Original PC8R data and proofs are by Samuel Lavery's team, Apache-2.0;
-this local adaptation retains all notices. Exact checker slack permits a
-slightly higher floor, after scaling the integer representation by 100.
-No frozen input is edited. A generated file still needs official verification.
+Original certificate by Samuel Lavery and team, Apache-2.0. All original
+notices retained. This is source construction; Lean replay is still required.
 """
 from pathlib import Path
-from fractions import Fraction as Q
 from hashlib import sha256
-import json
+from fractions import Fraction as F
+from difflib import unified_diff
+import ast
 import re
+import json
 
-HERE = Path(__file__).resolve().parent
-INPUT = HERE.parent/'window_gain/Candidate_taylor20.lean'
-INPUT_HASH = '9f27d659b6452a4c670ad02c9d6121dbb9df3ab5c4890c0abb1408bf456177f8'
-FACTOR = 100
-CN_NEW = 80872002
-SA_NEW = 10**10
-OLD_H = Q(672168410564118872,10**18)
-B = Q(406753,10**8)
-C_OLD,C_NEW = Q(808720,10**8),Q(CN_NEW,SA_NEW)
-Q_OLD,Q_NEW = (OLD_H-B)/(1-C_OLD),(OLD_H-B)/(1-C_NEW)
-COEFFICIENTS = {29489,57723,75811,80707,14035391,19809289,19852596,
-    46875914,100000000,200000000,29889708,32311531,47562183,
-    80147403,106248171,37074992,67688468,65257054,37999815,
-    6250000000000000}
+HERE=Path(__file__).resolve().parent
+INPUT=HERE.parent/'window_merge/Candidate_taylor20_9point.lean'
+EXPECTED='4253579322da07f6196c81d3eb2329740669711656b66d3ffd9f1eed6b68265a'
+OUT=HERE/'Candidate_taylor20_pc9_slack.lean'
+N=85638285
+H=F(672168410564118872522651,10**24)
+B=F(436674,10**8)
+Q0=(H-B)/(1-F(856382,10**8))
+Q=(H-B)/(1-F(N,10**10))
 
-def replace_checked(s,a,b,expected):
-    assert s.count(a) == expected,(a,s.count(a),expected)
+def change(s,a,b,n):
+    assert s.count(a)==n,(a,s.count(a),n)
     return s.replace(a,b)
 
 def transform_with_report(raw):
-    assert sha256(raw).hexdigest() == INPUT_HASH
-    source = raw.decode('utf-8')
-    assert '\r' not in source
-    body_start = source.index('import ChallengeDeps\n')
-    historical,body = source[:body_start],source[body_start:]
-    i0 = body.index('namespace AMW.Cert.PC8R\n')
-    i1 = body.index('end AMW.Cert.PC8R\n',i0)+len('end AMW.Cert.PC8R\n')
-    inst = body[i0:i1]
-    counts = {str(n):len(re.findall(r'(?<![\w])'+str(n)+r'(?![\w])',inst)) for n in sorted(COEFFICIENTS)}
-    assert all(counts.values()),counts
-    def scale(m):
-        n = int(m[0])
-        return str(n*FACTOR) if n in COEFFICIENTS else m[0]
-    inst_new = re.sub(r'(?<![\w])\d+(?![\w])',scale,inst)
-    inst_new = replace_checked(inst_new,'def cN : ℕ := 808720\n',f'def cN : ℕ := {CN_NEW}\n',1)
-    # Exact inverse verifies this subsection has no accidental edits.
-    reverse = {str(n*FACTOR):str(n) for n in COEFFICIENTS}
-    inst_reverse = replace_checked(inst_new,f'def cN : ℕ := {CN_NEW}\n','def cN : ℕ := 808720\n',1)
-    inst_reverse = re.sub(r'(?<![\w])\d+(?![\w])',lambda m:reverse.get(m[0],m[0]),inst_reverse)
-    assert inst_reverse == inst
-    body = body[:i0]+inst_new+body[i1:]
-    edits = [
-      ('((808720 : ℝ) / 100000000) ≤ Fw W8 g',f'(({CN_NEW} : ℝ) / {SA_NEW}) ≤ Fw W8 g',1),
-      ('def cFloor : ℝ := 808720 / 100000000',f'def cFloor : ℝ := {CN_NEW} / {SA_NEW}',1),
-      (f'{Q_OLD.numerator} / {Q_OLD.denominator}',f'{Q_NEW.numerator} / {Q_NEW.denominator}',4),
-    ]
-    for a,b,n in edits: body=replace_checked(body,a,b,n)
-    # Whole-body reversal: W8, tables, bit streams, source theorems unaffected
-    # except the explicit representation/floor/Q edits above.
-    back=body
-    for a,b,n in reversed(edits): back=replace_checked(back,b,a,n)
-    back=back[:i0]+inst+back[i0+len(inst_new):]
-    assert back == source[body_start:]
-    assert C_NEW > C_OLD and Q_NEW > Q_OLD
-    header = f'''/-
-R. Arun Chandru
-arun.chandru@gmail.com
-https://github.com/arun-chandru
-https://x.com/arunchandru
-https://researchgate.net/profile/R_Chandru
-
+    assert sha256(raw).hexdigest()==EXPECTED
+    src=raw.decode('utf-8')
+    a=src.index('namespace AMW.Cert.PC9QB5C\n')
+    b=src.index('end AMW.Cert.PC9QB5C\n',a)+len('end AMW.Cert.PC9QB5C\n')
+    inst=src[a:b]
+    bs=ast.literal_eval(re.search(r'^def BS : .* := (\[.*\])$',inst,re.M)[1])
+    ts=ast.literal_eval(re.search(r'^def TS : .* := (\[.*\])$',inst,re.M)[1])
+    sig=int(re.search(r'^def SIG : ℕ := (\d+)$',inst,re.M)[1])
+    coeff=set(bs)|{t[2] for t in ts}|{10**8,sig}
+    counts={str(v):len(re.findall(r'(?<![\w])'+str(v)+r'(?![\w])',inst)) for v in sorted(coeff)}
+    assert all(counts.values())
+    grown=re.sub(r'(?<![\w])\d+(?![\w])',lambda m:str(int(m[0])*100) if int(m[0]) in coeff else m[0],inst)
+    grown=change(grown,'def cN : ℕ := 856382\n',f'def cN : ℕ := {N}\n',1)
+    inverse={str(v*100):str(v) for v in coeff}
+    back=change(grown,f'def cN : ℕ := {N}\n','def cN : ℕ := 856382\n',1)
+    back=re.sub(r'(?<![\w])\d+(?![\w])',lambda m:inverse.get(m[0],m[0]),back)
+    assert back==inst
+    new=src[:a]+grown+src[b:]
+    replacements=[
+      ('((856382 : ℝ) / 100000000) ≤ Fw W9 g',f'(({N} : ℝ) / 10000000000) ≤ Fw W9 g',1),
+      ('(0 : ℝ) < 856382 / 100000000',f'(0 : ℝ) < {N} / 10000000000',2),
+      ('(1 - (856382 : ℝ) / 100000000)',f'(1 - ({N} : ℝ) / 10000000000)',2),
+      (f'{Q0.numerator} / {Q0.denominator}',f'{Q.numerator} / {Q.denominator}',5)]
+    for x,y,n in replacements:new=change(new,x,y,n)
+    back=new
+    for x,y,n in reversed(replacements):back=change(back,y,x,n)
+    back=back[:a]+inst+back[a+len(grown):]
+    assert back==src
+    notice='''/-
+Modified by R. Arun Chandru, 2026-10-12: exact certificate-floor refinement.
 Copyright (c) 2026 R. Arun Chandru, for this certificate-slack refinement.
 SPDX-License-Identifier: Apache-2.0
-
-Changes (2026-10-12): scale PC8R's integer weights, pressures, multiplier
-unit and denominator by 100, leaving its real functional and packed
-certificate unchanged; use the existing leaves' exact positive slack to
-raise the certified floor from 808720/10^8 to {CN_NEW}/10^10.
-Combined with the following order-20 window enclosure refinement.
-Critical-line proportion: {Q_NEW.numerator}/{Q_NEW.denominator}.
-Derived from Samuel Lavery's accepted attempt-020 at
-josusanmartin/riemann@e072ab396e34fd937224ff3f666d3d7a5db9fb18.
-All inherited notices are retained below and describe historical versions.
-This source requires full official compilation and both-kernel replay.
 -/
 '''
-    output=(header+historical+body).encode('utf-8')
-    report={
-      'input_sha256':sha256(raw).hexdigest(),'output_sha256':sha256(output).hexdigest(),
-      'output_bytes':len(output),'integer_scale':FACTOR,'scaled_literal_counts':counts,
-      'total_scaled_literals':sum(counts.values()),'cN':CN_NEW,'SA':SA_NEW,
-      'floor_old':str(C_OLD),'floor_new':str(C_NEW),'window_H':str(OLD_H),
-      'pressure_B':str(B),'score':str(Q_NEW),'score_decimal':str(float(Q_NEW)),
-      'gain_over_taylor20':str(Q_NEW-Q_OLD),
-      'gain_over_leader':str(Q_NEW-Q(167025220139218487,247978200000000000)),
-      'whole_body_reversal':'PASS','historical_notices_verbatim':True,
-      'kernel_status':'NOT REPLAYED',
-    }
-    return output,report
+    # Put modification notice after imports to avoid an obsolete score header.
+    ix=new.index('import ChallengeDeps\n')+len('import ChallengeDeps\n')
+    new=new[:ix]+notice+new[ix:]
+    assert len(new.encode('utf-8'))<2_000_000
+    report={'input_sha256':EXPECTED,'output_sha256':sha256(new.encode()).hexdigest(),
+      'output_bytes':len(new.encode()),'score':str(Q),'floor':str(F(N,10**10)),
+      'H':str(H),'pressure':str(B),'gain_over_Honly':str(Q-Q0),
+      'gain_over_attempt021':str(Q-F(166950417639218487,247859045000000000)),
+      'scale':100,'coefficient_literal_counts':counts,'inverse_allowlist':'PASS',
+      'kernel_status':'NOT YET REPLAYED','downstream_replacements':replacements}
+    return new.encode(),report
 
-def transform(source_bytes):
-    """Pure deterministic byte transform; does not access files or the network."""
-    return transform_with_report(source_bytes)[0]
+def transform(raw):return transform_with_report(raw)[0]
 
 def main():
-    raw=INPUT.read_bytes()
-    output,report=transform_with_report(raw)
-    dest=HERE/'Candidate_taylor20_pc8r_slack.lean'
-    dest.write_bytes(output)
+    raw=INPUT.read_bytes(); new,report=transform_with_report(raw)
+    OUT.write_bytes(new)
     (HERE/'combined_candidate_audit.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
+    (HERE/'combined_allowlisted.diff').write_text(''.join(unified_diff(raw.decode().splitlines(True),new.decode().splitlines(True),fromfile=INPUT.name,tofile=OUT.name)),encoding='utf-8')
     print(json.dumps(report,indent=2))
-
-if __name__ == '__main__': main()
+if __name__=='__main__':main()
