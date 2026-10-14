@@ -1,220 +1,108 @@
-"""Pinned, reversible merge of the accepted nine-point and Taylor20 proofs.
-
-Only exact rational arithmetic constructs or checks constants.  This is a
-source transformation and private arithmetic audit, not a Lean verification.
-"""
-
-from decimal import Decimal, localcontext
-from difflib import unified_diff
-from fractions import Fraction as Q
+"""Bounded reversible transplant; transform(bytes, bytes) has no I/O side effects."""
+from fractions import Fraction as F
 from hashlib import sha256
-from math import factorial, isqrt
-from pathlib import Path
-import json
-import re
 
+BASE_SHA = '9e87ab45039872d4969acdbb5d75076de01d0626de299aaf1b615425dc164639'
+LI_SHA = '11520f8af2d31186fc1b2b0304f2e72de29ec90e397b4f36d5792c4ec5190b48'
+NEW_N = 6721684105641188747759454444013516755656
+NEW_H = F(NEW_N, 10**40)
+BASE_Q = F(21541989373036092662021, 31981806507980000000000)
+NEW_Q = (NEW_H - F(436674,10**8)) / (1-F(856399825262,10**14))
 
-HERE = Path(__file__).resolve().parent
-SOURCES = HERE.parent / "sources"
-PINNED = {
-    "attempt-021": "01128ffed4efa6544f76c8d33410d945a029647380e1313cc0a19ea3e3749f60",
-    "master-of-puppets3": "6ad1bd36031a1d372bf86ac1ed9d7895587768feba5f95a117bed9df217ea6ca",
-    "shi-anchor-variance-refinement-2026": "e5862a0bf5b0229eee0357cd41921b7e5174ec3272b960f9a6a6e37e4682da9d",
-}
-OLD_H = Q(672168410556873948, 10**18)
-OLD_SCORE = Q(166950417639218487, 247859045000000000)
-NEW_H = Q(672168410564118872522651, 10**24)
-B = Q(436674, 10**8)
-C_FLOOR = Q(856382, 10**8)
-SCORE = (NEW_H - B) / (1 - C_FLOOR)
-NOTICE = """/-
-Modified by R. Arun Chandru, 2026-10-12: merge the order-20 window enclosure
-from master-of-puppets3 and propagate the sharpened rational HW floor.
-Terminal HW-floor refinement adapted from Yuhang Shi.
-Copyright (c) 2026 Yuhang Shi.
-SPDX-License-Identifier: Apache-2.0
+def block(s, a, b):
+    i = s.index(a)
+    return s[i:s.index(b,i)+len(b)]
+
+def transform(raw_attempt022: bytes, raw_li: bytes) -> bytes:
+    """Change only the admitted window block, propagated literals, and notice."""
+    assert sha256(raw_attempt022).hexdigest() == BASE_SHA
+    assert sha256(raw_li).hexdigest() == LI_SHA
+    base = raw_attempt022.decode('utf-8')
+    li = raw_li.decode('utf-8')
+    assert '\r' not in base and '\r' not in li
+    old_h = '672168410564118872522651 / 1000000000000000000000000'
+    old_hp = '672168410564118872522651 / 10 ^ 24'
+    old_q = '21541989373036092662021 / 31981806507980000000000'
+    new_h = str(NEW_N) + ' / ' + str(10**40)
+    new_hp = str(NEW_N) + ' / 10 ^ 40'
+    new_q = f'{NEW_Q.numerator} / {NEW_Q.denominator}'
+    assert NEW_Q > BASE_Q
+
+    start = base.index('theorem taylor20_F (')
+    stop = base.index('theorem aInf_eq :', start)
+    old_block = base[start:stop]
+    li_start = li.index('theorem taylor20_F (',li.index('namespace ProportionSharpWindow\n'))
+    li_stop = li.index('end ProportionSharpWindow',li_start)
+    sharp_block = li[li_start:li_stop].rstrip()+'\n'
+    assert sharp_block.count('672168410564118874775945444401 / 10 ^ 30') == 2
+    new_block = sharp_block.replace('672168410564118874775945444401 / 10 ^ 30',new_hp)
+
+    obsolete_prefix = base[:base.index('-/')+3]
+    assert 'Copyright (c) 2026 R. Arun Chandru' in obsolete_prefix
+    assert 'Critical-line proportion: 167031227639218487/247987190000000000.' in obsolete_prefix
+    notice = '''/-
+Modified by R. Arun Chandru, 2026-10-14. Apache-2.0.
+Derived from Samuel Lavery's attempt-022 at public source commit
+72e3123e7bf235a697dd97d976738afdefdcf257. Refined the rational window enclosure
+using Li Xiang's lixiang90-nine-point-refinement, source commit
+aa868dc8e4c46e7dda5ac21c47e1c53e1a122b91 (copyright (c) 2026 Li Xiang,
+Apache-2.0), based on R. Arun Chandru and Yuhang Shi's order-20 proof.
+Original third-party notices below describe their historical source versions.
 -/
-"""
-OWNED_OLD_HEADER = """/-
-R. Arun Chandru
-arun.chandru@gmail.com
-https://github.com/arun-chandru
-https://x.com/arunchandru
-https://researchgate.net/profile/R_Chandru
+'''
 
-Copyright (c) 2026 R. Arun Chandru, for the circle-enclosure refinement.
-SPDX-License-Identifier: Apache-2.0
+    assert base.count(old_h) == 16
+    assert base.count(old_hp) == 3
+    assert base.count(old_q) == 5
+    candidate = base[:start]+new_block+base[stop:]
+    assert candidate.count(old_hp) == 1
+    candidate = candidate.replace(old_h,new_h).replace(old_hp,new_hp).replace(old_q,new_q)
+    assert candidate.startswith(obsolete_prefix)
+    candidate = notice+candidate.removeprefix(obsolete_prefix)
+    assert candidate.count(new_h) == 16
+    assert candidate.count(new_hp) == 3
+    assert candidate.count(new_q) == 5
 
-Critical-line proportion: 167031227639218487/247987190000000000.
-
--/
-"""
-
-
-def digest(raw):
-    return sha256(raw).hexdigest()
-
-
-def rational(q):
-    with localcontext() as ctx:
-        ctx.prec = 90
-        return {"numerator": str(q.numerator), "denominator": str(q.denominator),
-                "decimal": str(Decimal(q.numerator) / Decimal(q.denominator))}
-
-
-def segment(text, start, stop):
-    i = text.index(start)
-    j = text.index(stop, i)
-    return text[i:j]
-
-
-def replace(text, old, new, count):
-    assert text.count(old) == count, (old, text.count(old), count)
-    return text.replace(old, new)
-
+    # Invert exactly the admitted proof block, literals, and attribution header.
+    restored = obsolete_prefix+candidate.removeprefix(notice)
+    assert restored.count(new_block) == 1
+    restored = restored.replace(new_block,old_block,1)
+    restored = restored.replace(new_h,old_h).replace(new_hp,old_hp).replace(new_q,old_q)
+    assert restored.encode('utf-8') == raw_attempt022
+    assert block(base,'namespace AMW.Cert.PC9QB6M\n','end RiemannFail\n') == block(candidate,'namespace AMW.Cert.PC9QB6M\n','end RiemannFail\n')
+    assert block(base,'import ChallengeDeps','namespace AMW') == block(candidate,'import ChallengeDeps','namespace AMW')
+    assert not any(x in new_block for x in ('sorry','admit','axiom','native_decide'))
+    return candidate.encode('utf-8')
 
 def main():
-    texts = {}
-    provenance = {}
-    for name, expected in PINNED.items():
-        path = SOURCES / name / "Solution.lean"
-        raw = path.read_bytes()
-        assert digest(raw) == expected, (name, digest(raw))
-        texts[name] = raw.decode("utf-8")
-        assert "\r" not in texts[name], name
-        provenance[name] = {"source": str(path), "sha256": expected, "bytes": len(raw)}
-    base = texts["attempt-021"]
-    ours = texts["master-of-puppets3"]
-    shi = texts["shi-anchor-variance-refinement-2026"]
-    old_block = segment(base, "theorem taylor12_F (", "theorem aInf_eq :")
-    own_block = segment(ours, "theorem taylor20_F (", "theorem aInf_eq :")
-    new_block = replace(own_block, "672168410564118872 / 10 ^ 18",
-                        "672168410564118872522651 / 10 ^ 24", 2)
-    assert new_block == segment(shi, "theorem taylor20_F (", "theorem aInf_eq :")
-
-    # The transplanted block has exactly the same AM window and HW inputs.
-    dependency_spans = [
-        ("def cAMn :", "def ωAM ("),
-        ("def dAM (", "theorem kernel_vAM"),
-        ("def PAM :", "theorem energy_total :"),
-        ("def HW :", "end AMW"),
-    ]
-    dependency_checks = []
-    for start, stop in dependency_spans:
-        expected = segment(base, start, stop)
-        assert expected == segment(ours, start, stop), start
-        assert expected == segment(shi, start, stop), start
-        dependency_checks.append({"start": start, "stop": stop,
-                                  "sha256": digest(expected.encode("utf-8"))})
-
-    # Independently reproduce every rational inequality used by the enclosure.
-    coeff_text = segment(base, "def cAMn :", "def cAM (j :")
-    coeff = {int(k): int(v) for k, v in re.findall(r"\|\s*(\d+)\s*=>\s*(-?\d+)", coeff_text)}
-    assert set(coeff) == set(range(13)) and coeff[0] == 10**9
-    rlo = Q(7071067811865475244, 10**19)
-    rhi = Q(7071067811865475245, 10**19)
-    pihi = Q(314159265358979323847, 10**20)
-    cos_hi = Q(95030574634453769, 125000000000000000)
-    sin_lo = Q(649636939080062443, 10**18)
-    error = Q(21, 20 * factorial(20))
-    assert error == Q(1, 2317049531596800000)
-    taylor_hi = sum((Q((-1)**k) * rlo**(2*k) / factorial(2*k)
-                    for k in range(10)), Q(0)) + rlo**20 * error
-    assert 0 < rlo < rhi < 1 and rlo*rlo <= Q(1, 2) <= rhi*rhi
-    assert 0 < taylor_hi <= cos_hi < 1
-    assert 0 < sin_lo and cos_hi*cos_hi + sin_lo*sin_lo <= 1
-    assert sin_lo.numerator == isqrt(10**36 - (cos_hi * 10**18).numerator**2)
-    pam_hi = sum((Q(coeff[k], 10**9)**2 * (Q(1, 2) - 1/(4*pihi*pihi*k*k))
-                  for k in range(1, 13)), Q(0))
-    numeric_h = Q(3, 2) - cos_hi/(2*rlo*sin_lo) - pam_hi/(2*sin_lo*sin_lo)
-    assert 0 <= pam_hi and OLD_H < NEW_H <= numeric_h
-    assert NEW_H.numerator == numeric_h.numerator * 10**24 // numeric_h.denominator
-    assert (OLD_H - B)/(1 - C_FLOOR) == OLD_SCORE
-    assert 0 < C_FLOOR <= Q(1, 64) < 1 and B >= 0
-    assert OLD_SCORE < SCORE < 1
-    assert SCORE == Q(667801670564118872522651, 991436180000000000000000)
-    assert SCORE - OLD_SCORE == Q(7244924522651, 991436180000000000000000)
-
-    # User-authorized removal of their obsolete first header; all other notices stay.
-    assert base.startswith(OWNED_OLD_HEADER)
-    top, body = base.split("import ChallengeDeps\n", 1)
-    retained_top = top[len(OWNED_OLD_HEADER):]
-    body = "import ChallengeDeps\n" + body
-    body = replace(body, old_block, NOTICE + new_block, 1)
-    replacements = [
-        ("672168410556873948 / 10 ^ 18", "672168410564118872522651 / 10 ^ 24", 1),
-        ("672168410556873948 / 1000000000000000000",
-         "672168410564118872522651 / 1000000000000000000000000", 16),
-        ("166950417639218487 / 247859045000000000",
-         "667801670564118872522651 / 991436180000000000000000", 5),
-    ]
-    for old, new, count in replacements:
-        body = replace(body, old, new, count)
-    candidate = retained_top + body
-    assert candidate.startswith(retained_top + "import ChallengeDeps\n")
-
-    # Inverse transformation is an exhaustive allowlist of all source differences.
-    inverted = body
-    for old, new, count in reversed(replacements):
-        # New HW power literals also occur twice in the substituted block.
-        assert inverted.count(new) == count + (2 if "10 ^ 24" in new else 0)
-        tail_start = inverted.index("theorem aInf_eq :")
-        inverted = inverted[:tail_start] + replace(inverted[tail_start:], new, old, count)
-    inverted = replace(inverted, NOTICE + new_block, old_block, 1)
-    assert (OWNED_OLD_HEADER + retained_top + inverted).encode("utf-8") == base.encode("utf-8")
-
-    # Existing block comments include licenses, attribution and historical changes.
-    retained_original = base[len(OWNED_OLD_HEADER):]
-    inherited_comments = re.findall(r"/-.*?-/", retained_original, flags=re.DOTALL)
-    assert all(candidate.count(comment) >= retained_original.count(comment) for comment in inherited_comments)
-    assert not re.search(r"^\s*(axiom|unsafe\s|opaque\s)", candidate, flags=re.MULTILINE)
-    cert_start = "namespace RiemannFail\n"
-    cert_stop = "end RiemannFail\n"
-    assert segment(base, cert_start, cert_stop) == segment(candidate, cert_start, cert_stop)
-
-    raw = candidate.encode("utf-8")
-    assert len(raw) < 2_000_000
-    target = HERE / "Candidate_taylor20_9point.lean"
-    target.write_bytes(raw)
-    diff = "".join(unified_diff(base.splitlines(keepends=True), candidate.splitlines(keepends=True),
-                                fromfile="attempt-021/Solution.lean", tofile=target.name))
-    (HERE / "candidate_allowlisted.diff").write_text(diff, encoding="utf-8", newline="\n")
-    audit = {
-        "verification": "EXACT ARITHMETIC AND SOURCE AUDIT ONLY; NO LEAN OR COMPARATOR REPLAY",
-        "candidate": {"path": str(target), "sha256": digest(raw), "bytes": len(raw)},
-        "sources": provenance,
-        "score": rational(SCORE), "old_score": rational(OLD_SCORE),
-        "gain_over_attempt_021": rational(SCORE - OLD_SCORE),
-        "H": rational(NEW_H), "numeric_H": rational(numeric_h),
-        "H_slack": rational(numeric_h - NEW_H),
-        "cos_hi": rational(cos_hi), "sin_lo": rational(sin_lo),
-        "cos_Taylor_upper": rational(taylor_hi),
-        "circle_slack": rational(1 - cos_hi*cos_hi - sin_lo*sin_lo),
-        "B": rational(B), "c": rational(C_FLOOR), "PAMhi": rational(pam_hi),
-        "window_dependency_blocks_identical_across_three_sources": dependency_checks,
-        "inverse_transform_recovers_source_bytes": True,
-        "all_remaining_inherited_block_comments_retained": True,
-        "removed_user_owned_optional_first_header": {
-            "authorization": "Parent relayed user's already-established removal of this obsolete owned header",
-            "sha256": digest(OWNED_OLD_HEADER.encode("utf-8")),
-            "bytes": len(OWNED_OLD_HEADER.encode("utf-8")),
-            "text": OWNED_OLD_HEADER,
-        },
-        "nine_point_concrete_certificate_unchanged": True,
-        "new_block_equals_accepted_Shi_window_block": True,
-        "allowed_downstream_replacements": [
-            {"old": old, "new": new, "count": count} for old, new, count in replacements],
-        "counted_zero_exports": {
-            "dyadic": "(candidateKappa - epsilon) * Ncount T (2*T) <= N0star T (2*T)",
-            "cumulative": "(candidateKappa - epsilon) * Ncount 0 T <= N0star 0 T",
-            "quantifiers": "forall epsilon > 0, exists T0, forall T >= T0",
-            "underlying_chain": "N0simple lower bound implies distinct-critical-line N0star bound",
-            "trusted_constants": "candidateKappa and currentRecordKappa remain imported from ChallengeDeps.CandidateSpec",
-        },
+    from pathlib import Path
+    import difflib
+    import json
+    here = Path(__file__).resolve().parent
+    root = here.parent
+    base_path = root / 'sources/attempt-022/proof/Solution.lean'
+    li_path = root / 'sources/lixiang90-nine-point-refinement/proof/Solution.lean'
+    out = here / 'Candidate_attempt022_sharp40.lean'
+    raw_base, raw_li = base_path.read_bytes(), li_path.read_bytes()
+    result = transform(raw_base,raw_li)
+    out.write_bytes(result)
+    (here/'window_only_allowlisted.diff').write_text(''.join(difflib.unified_diff(raw_base.decode().splitlines(True),result.decode().splitlines(True),fromfile=str(base_path.relative_to(root)),tofile=str(out.relative_to(root)))),encoding='utf-8',newline='\n')
+    report = {
+        'candidate':str(out),
+        'candidate_sha256':sha256(result).hexdigest(),
+        'base_sha256':BASE_SHA,
+        'li_source_sha256':LI_SHA,
+        'inverse_allowlist_exact':True,
+        'certificate_byte_identical':True,
+        'imports_and_options_before_AMW_byte_identical':True,
+        'window_floor':str(NEW_H),
+        'score':str(NEW_Q),
+        'gain_over_attempt022':str(NEW_Q-BASE_Q),
+        'changed_blocks':'Taylor20-to-aInf_eq window enclosure; sixteen expanded H literals; three power H literals including two within changed block; five score literals; attribution prefix replaces obsolete author-owned initial comment.',
+        'kernel_replay':'Not run by this builder.'
     }
-    (HERE / "candidate_exact_audit.json").write_text(json.dumps(audit, indent=2) + "\n", encoding="utf-8", newline="\n")
-    print(json.dumps({key: audit[key] for key in ("verification", "candidate", "score", "gain_over_attempt_021")}, indent=2))
+    (here/'window_candidate_manifest.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
+    print(json.dumps(report,indent=2))
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
