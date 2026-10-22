@@ -3,7 +3,7 @@ name: Proof resource test
 on:
   push:
     branches:
-      - codex/record-reclaim-2026-10-14
+      - codex/wl1-terminal-2026-10-22
   workflow_dispatch:
 
 permissions:
@@ -21,9 +21,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Materialize hash-pinned proof candidate
-        shell: bash
-        run: python3 environment/record-reclaim/materialize_candidate.py --output r_arun_chandru_proof.lean
       - name: Proof resource test
         shell: bash
         run: sudo --preserve-env=GITHUB_WORKSPACE,GITHUB_REPOSITORY,GITHUB_REF,GITHUB_RUN_ID,GITHUB_RUN_ATTEMPT,GITHUB_STEP_SUMMARY bash environment/github-resource-trial/runner.sh
